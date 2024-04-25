@@ -355,11 +355,11 @@ function fetchNextJob (schema) {
     WITH nextJob as (
       SELECT id
       FROM ${schema}.job j
-      WHERE state < '${states.active}'
+      WHERE state ${enforceSingletonQueueActiveLimit ? '<=' : '<'} '${states.active}'
         AND name LIKE $1
         AND startAfter < now()
         ${enforceSingletonQueueActiveLimit
-        ? `AND (
+            ? `AND (
           CASE
             WHEN singletonKey IS NOT NULL
               AND singletonKey LIKE '${SINGLETON_QUEUE_KEY_ESCAPED}%'
@@ -375,17 +375,17 @@ function fetchNextJob (schema) {
               true
           END
         )`
-        : ''}
+            : ''}
       ORDER BY priority desc, createdOn, id
       LIMIT $2
-      FOR UPDATE SKIP LOCKED
+      FOR UPDATE ${enforceSingletonQueueActiveLimit ? '' : 'SKIP LOCKED'}
     )
     UPDATE ${schema}.job j SET
       state = '${states.active}',
       startedOn = now(),
       retryCount = CASE WHEN state = '${states.retry}' THEN retryCount + 1 ELSE retryCount END
     FROM nextJob
-    WHERE j.id = nextJob.id
+    WHERE j.id = nextJob.id AND j.state <> '${states.active}'
     RETURNING ${includeMetadata ? 'j.*' : 'j.id, name, data'}, EXTRACT(epoch FROM expireIn) as expire_in_seconds
   `
 }
