@@ -372,11 +372,19 @@ function fetchNextJob (schema) {
                   LIMIT 1
               )
             ELSE
-              true
+              NOT EXISTS (
+                SELECT 1
+                FROM ${schema}.job active_job
+                WHERE active_job.state = '${states.active}'
+                  AND active_job.name LIKE $1
+                  LIMIT 1
+              )            
           END
         )`
             : ''}
-      ORDER BY priority desc, createdOn, id
+      ORDER BY priority ${
+        enforceSingletonQueueActiveLimit ? "" : "desc"
+      }, createdOn, id
       LIMIT $2
       FOR UPDATE ${enforceSingletonQueueActiveLimit ? '' : 'SKIP LOCKED'}
     )

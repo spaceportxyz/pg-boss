@@ -483,15 +483,15 @@ class Manager extends EventEmitter {
     if (options.enforceSingletonQueueActiveLimit && !options.db) {
       // Prepare/format now and send multi-statement transaction
       const fetchQuery = preparedStatement
-        .replace('$1', Db.quotePostgresStr(statementValues[0]))
+        .replaceAll('$1', Db.quotePostgresStr(statementValues[0]))
         .replace('$2', statementValues[1].toString())
       // eslint-disable-next-line no-unused-vars
       const [_begin, _setLocal, fetchResult, _commit] = await db.executeSql([
         'BEGIN',
         'SET LOCAL jit = OFF', // JIT can slow things down significantly
-        fetchQuery,
-        'COMMIT'
-      ].join(';\n'))
+          fetchQuery,
+          'COMMIT'
+        ].join(';\n'))
       result = fetchResult
     } else {
       result = await db.executeSql(preparedStatement, statementValues)
