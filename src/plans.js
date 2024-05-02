@@ -355,7 +355,11 @@ function fetchNextJob (schema) {
     WITH nextJob as (
       SELECT id
       FROM ${schema}.job j
-      WHERE state ${enforceSingletonQueueActiveLimit ? '<=' : '<'} '${states.active}'
+      WHERE  ${
+        enforceSingletonQueueActiveLimit
+          ? `(state <= '${states.active}' OR state = '${states.failed}')`
+          : `state < '${states.active}'`
+      } 
         AND name LIKE $1
         AND startAfter < now()
         ${enforceSingletonQueueActiveLimit
@@ -393,7 +397,9 @@ function fetchNextJob (schema) {
       startedOn = now(),
       retryCount = CASE WHEN state = '${states.retry}' THEN retryCount + 1 ELSE retryCount END
     FROM nextJob
-    WHERE j.id = nextJob.id AND j.state <> '${states.active}'
+    WHERE j.id = nextJob.id AND j.state <> '${
+      states.active
+    }' ${enforceSingletonQueueActiveLimit ? `AND j.state <> '${states.failed}'` : ''}
     RETURNING ${includeMetadata ? 'j.*' : 'j.id, name, data'}, EXTRACT(epoch FROM expireIn) as expire_in_seconds
   `
 }
